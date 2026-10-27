@@ -442,6 +442,7 @@ void Creature::onCreatureMove(const std::shared_ptr<Creature> &creature, const s
 	if (creature.get() == this) {
 		lastStep = OTSYS_TIME();
 		lastStepCost = 1;
+		chaseStepCommitted = false;
 
 		if (!teleport) {
 			if (oldPos.z != newPos.z) {
@@ -1011,11 +1012,24 @@ void Creature::goToFollowCreature() {
 		hasFollowPath = getPathTo(followCreature->getPosition(), listDir, fpp);
 	}
 
-	// Practice server: an idle hostile monster starts chasing on the same tick its target steps away,
-	// like on the official servers. ImmediateWhenReady still honours the walk delay of a monster that
-	// is mid-walk, so this never makes a monster step faster than its speed allows.
-	const auto startPolicy = monster && !monster->getMaster() ? WalkStartPolicy::ImmediateWhenReady : WalkStartPolicy::RespectDelay;
-	startAutoWalk(listDir, false, startPolicy);
+	if (monster && !monster->getMaster()) {
+		// Practice server: an idle hostile monster reacts to its target stepping away after
+		// monsterChaseReactionDelay ms and then commits to that first step, finishing it even if the
+		// target comes back within reach meanwhile, like on the official servers.
+		if (listDir.empty() && chaseStepCommitted && eventWalk != 0 && !listWalkDir.empty()) {
+			listWalkDir.erase(listWalkDir.begin(), listWalkDir.end() - 1); // keep only the next step
+			if (executeOnFollow) {
+				onFollowCreatureComplete(followCreature);
+			}
+			return;
+		}
+
+		const bool wasIdle = eventWalk == 0 && listWalkDir.empty();
+		chaseStepCommitted = (wasIdle || chaseStepCommitted) && !listDir.empty();
+		startAutoWalk(listDir, false, chaseStepCommitted ? WalkStartPolicy::MonsterReaction : WalkStartPolicy::RespectDelay);
+	} else {
+		startAutoWalk(listDir);
+	}
 
 	if (executeOnFollow) {
 		onFollowCreatureComplete(followCreature);
@@ -1501,6 +1515,14 @@ int64_t Creature::getEventStepTicks(WalkStartPolicy startPolicy) {
 	}
 
 	const uint16_t stepDuration = getStepDuration();
+	if (startPolicy == WalkStartPolicy::MonsterReaction && stepDuration > 0) {
+		const int64_t fullDelay = static_cast<int64_t>(stepDuration) * lastStepCost;
+		const int64_t reaction = g_configManager().getNumber(MONSTER_CHASE_REACTION_DELAY);
+		if (reaction >= 0) {
+			return std::clamp<int64_t>(reaction, 1, fullDelay);
+		}
+		return fullDelay;
+	}
 	return startPolicy == WalkStartPolicy::ImmediateWhenReady && stepDuration > 0 ? 1 : stepDuration * lastStepCost;
 }
 

@@ -292,6 +292,7 @@ bool ConfigManager::load() {
 	loadIntConfig(L, LOYALTY_POINTS_PER_PREMIUM_DAY_PURCHASED, "loyaltyPointsPerPremiumDayPurchased", 0);
 	loadIntConfig(L, LOYALTY_POINTS_PER_PREMIUM_DAY_SPENT, "loyaltyPointsPerPremiumDaySpent", 0);
 	loadIntConfig(L, MAX_ALLOWED_ON_A_DUMMY, "maxAllowedOnADummy", 1);
+	loadIntConfig(L, MONSTER_CHASE_REACTION_DELAY, "monsterChaseReactionDelay", -1);
 	loadIntConfig(L, MAX_CONTAINER_ITEM, "maxItem", 5000);
 	loadIntConfig(L, MAX_CONTAINER, "maxContainer", 500);
 	loadIntConfig(L, MAX_CONTAINER_DEPTH, "maxContainerDepth", 200);

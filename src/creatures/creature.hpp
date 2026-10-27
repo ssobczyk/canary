@@ -225,6 +225,9 @@ public:
 		/// Preserve legacy input responsiveness by requesting the first step
 		/// immediately when walking is ready.
 		ImmediateWhenReady,
+		/// Practice server: an idle monster starting a chase waits
+		/// monsterChaseReactionDelay ms (capped at the full step) when walking is ready.
+		MonsterReaction,
 	};
 
 	/**
@@ -882,6 +885,8 @@ protected:
 	bool lootDrop = true;
 	bool cancelNextWalk = false;
 	bool forceUpdateFollowPath = false;
+	// first chase step of an idle monster; finished even if the target comes back within reach
+	bool chaseStepCommitted = false;
 	bool hiddenHealth = false;
 	bool floorChange = false;
 	bool canUseDefense = true;
