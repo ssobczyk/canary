@@ -311,6 +311,16 @@ class PlayerFunctions {
 	static int luaPlayerGetWheelSpellAdditionalDuration(lua_State* L);
 	static int luaPlayerGetWheelSpellAdditionalDamage(lua_State* L);
 	static int luaPlayerWheelUnlockScroll(lua_State* L);
+	// Practice server wheel import
+	static int luaPlayerSetWheelSlotPoints(lua_State* L);
+	static int luaPlayerGetWheelSlotPoints(lua_State* L);
+	static int luaPlayerAddWheelGem(lua_State* L);
+	static int luaPlayerSetActiveWheelGem(lua_State* L);
+	static int luaPlayerGetActiveWheelGem(lua_State* L);
+	static int luaPlayerGetWheelModGrade(lua_State* L);
+	static int luaPlayerSetWheelModGrade(lua_State* L);
+	static int luaPlayerGetWheelTotalPoints(lua_State* L);
+	static int luaPlayerReloadWheel(lua_State* L);
 
 	static int luaPlayerOpenForge(lua_State* L);
 	static int luaPlayerCloseForge(lua_State* L);

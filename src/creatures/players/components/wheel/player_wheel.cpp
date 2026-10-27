@@ -1300,6 +1300,86 @@ void PlayerWheel::removeActiveGem(WheelGemAffinity_t affinity) {
 	m_activeGems[static_cast<uint8_t>(affinity)] = emptyGem;
 }
 
+uint16_t PlayerWheel::addPracticeGem(WheelGemAffinity_t affinity, WheelGemQuality_t quality, WheelGemBasicModifier_t basicModifier1, WheelGemBasicModifier_t basicModifier2, WheelGemSupremeModifier_t supremeModifier) {
+	if (quality < WheelGemQuality_t::Regular) {
+		basicModifier2 = {};
+	}
+	if (quality < WheelGemQuality_t::Greater) {
+		supremeModifier = {};
+	}
+
+	// Reuse an identical gem so repeated imports don't pile up copies in the atelier
+	for (uint16_t i = 0; i < m_revealedGems.size(); ++i) {
+		const auto &gem = m_revealedGems[i];
+		if (gem.affinity == affinity && gem.quality == quality && gem.basicModifier1 == basicModifier1 && gem.basicModifier2 == basicModifier2 && gem.supremeModifier == supremeModifier) {
+			return i;
+		}
+	}
+
+	PlayerWheelGem gem;
+	gem.uuid = KV::generateUUID();
+	gem.locked = false;
+	gem.affinity = affinity;
+	gem.quality = quality;
+	gem.basicModifier1 = basicModifier1;
+	gem.basicModifier2 = basicModifier2;
+	gem.supremeModifier = supremeModifier;
+	m_revealedGems.emplace_back(gem);
+
+	std::ranges::sort(m_revealedGems, [](const auto &gem1, const auto &gem2) {
+		if (std::ranges::all_of(gem1.uuid, ::isdigit) && std::ranges::all_of(gem2.uuid, ::isdigit)) {
+			return std::stoull(gem1.uuid) < std::stoull(gem2.uuid);
+		} else {
+			return gem1.uuid < gem2.uuid;
+		}
+	});
+
+	return getGemIndex(gem.uuid);
+}
+
+const PlayerWheelGem &PlayerWheel::getPracticeActiveGem(WheelGemAffinity_t affinity) const {
+	return m_activeGems[static_cast<uint8_t>(affinity)];
+}
+
+uint8_t PlayerWheel::getPracticeModGrade(WheelFragmentType_t type, uint8_t pos) const {
+	if (type == WheelFragmentType_t::Lesser) {
+		return pos < m_basicGrades.size() ? m_basicGrades[pos] : 0;
+	}
+	return pos < m_supremeGrades.size() ? m_supremeGrades[pos] : 0;
+}
+
+bool PlayerWheel::setPracticeModGrade(WheelFragmentType_t type, uint8_t pos, uint8_t grade) {
+	if (grade > 3) {
+		return false;
+	}
+
+	uint8_t* current = nullptr;
+	if (type == WheelFragmentType_t::Lesser && pos < m_basicGrades.size()) {
+		current = &m_basicGrades[pos];
+	} else if (type == WheelFragmentType_t::Greater && pos < m_supremeGrades.size()) {
+		current = &m_supremeGrades[pos];
+	}
+	if (!current) {
+		return false;
+	}
+
+	// Each mod at grade III is worth one extra wheel point
+	if (*current == 3 && m_modsMaxGrade > 0) {
+		--m_modsMaxGrade;
+	}
+	if (grade == 3) {
+		++m_modsMaxGrade;
+	}
+	*current = grade;
+	// saveKVModGrades skips grade 0, so store it here to make lowering a grade stick
+	gemsGradeKV(type, pos)->set("grade", grade);
+	return true;
+}
+
+uint16_t PlayerWheel::getPracticeTotalPoints() const {
+	return getWheelPoints() + m_modsMaxGrade;
+}
+
 void PlayerWheel::addRevelationBonus(WheelGemAffinity_t affinity, uint16_t points) {
 	m_bonusRevelationPoints[static_cast<size_t>(affinity)] += points;
 }

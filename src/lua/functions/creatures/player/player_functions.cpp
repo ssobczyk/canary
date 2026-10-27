@@ -403,6 +403,15 @@ void PlayerFunctions::init(lua_State* L) {
 	Lua::registerMethod(L, "Player", "getWheelSpellAdditionalTarget", PlayerFunctions::luaPlayerGetWheelSpellAdditionalTarget);
 	Lua::registerMethod(L, "Player", "getWheelSpellAdditionalDuration", PlayerFunctions::luaPlayerGetWheelSpellAdditionalDuration);
 	Lua::registerMethod(L, "Player", "wheelUnlockScroll", PlayerFunctions::luaPlayerWheelUnlockScroll);
+	Lua::registerMethod(L, "Player", "setWheelSlotPoints", PlayerFunctions::luaPlayerSetWheelSlotPoints);
+	Lua::registerMethod(L, "Player", "getWheelSlotPoints", PlayerFunctions::luaPlayerGetWheelSlotPoints);
+	Lua::registerMethod(L, "Player", "addWheelGem", PlayerFunctions::luaPlayerAddWheelGem);
+	Lua::registerMethod(L, "Player", "setActiveWheelGem", PlayerFunctions::luaPlayerSetActiveWheelGem);
+	Lua::registerMethod(L, "Player", "getActiveWheelGem", PlayerFunctions::luaPlayerGetActiveWheelGem);
+	Lua::registerMethod(L, "Player", "getWheelModGrade", PlayerFunctions::luaPlayerGetWheelModGrade);
+	Lua::registerMethod(L, "Player", "setWheelModGrade", PlayerFunctions::luaPlayerSetWheelModGrade);
+	Lua::registerMethod(L, "Player", "getWheelTotalPoints", PlayerFunctions::luaPlayerGetWheelTotalPoints);
+	Lua::registerMethod(L, "Player", "reloadWheel", PlayerFunctions::luaPlayerReloadWheel);
 
 	// Forge Functions
 	Lua::registerMethod(L, "Player", "openForge", PlayerFunctions::luaPlayerOpenForge);
@@ -4870,6 +4879,186 @@ int PlayerFunctions::luaPlayerWheelUnlockScroll(lua_State* L) {
 	}
 
 	lua_pushboolean(L, player->wheel().unlockScroll(scrollName));
+	return 1;
+}
+
+int PlayerFunctions::luaPlayerSetWheelSlotPoints(lua_State* L) {
+	// player:setWheelSlotPoints(slot, points)
+	const auto &player = Lua::getUserdataShared<Player>(L, 1, "Player");
+	if (!player) {
+		Lua::reportErrorFunc(Lua::getErrorDesc(LUA_ERROR_PLAYER_NOT_FOUND));
+		Lua::pushBoolean(L, false);
+		return 1;
+	}
+
+	const auto slot = Lua::getNumber<uint8_t>(L, 2);
+	const auto points = Lua::getNumber<uint16_t>(L, 3);
+	if (slot < 1 || slot > magic_enum::enum_count<WheelSlots_t>() || points > player->wheel().getMaxPointsPerSlot(static_cast<WheelSlots_t>(slot))) {
+		Lua::pushBoolean(L, false);
+		return 1;
+	}
+
+	player->wheel().setPointsBySlotType(slot, points);
+	Lua::pushBoolean(L, true);
+	return 1;
+}
+
+int PlayerFunctions::luaPlayerGetWheelSlotPoints(lua_State* L) {
+	// player:getWheelSlotPoints(slot)
+	const auto &player = Lua::getUserdataShared<Player>(L, 1, "Player");
+	if (!player) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	const auto slot = Lua::getNumber<uint8_t>(L, 2);
+	if (slot < 1 || slot > magic_enum::enum_count<WheelSlots_t>()) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	lua_pushnumber(L, player->wheel().getPointsBySlotType(static_cast<WheelSlots_t>(slot)));
+	return 1;
+}
+
+int PlayerFunctions::luaPlayerAddWheelGem(lua_State* L) {
+	// player:addWheelGem(affinity, quality, basicModifier1[, basicModifier2[, supremeModifier]])
+	const auto &player = Lua::getUserdataShared<Player>(L, 1, "Player");
+	if (!player) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	const auto affinity = Lua::getNumber<uint8_t>(L, 2);
+	const auto quality = Lua::getNumber<uint8_t>(L, 3);
+	if (affinity >= magic_enum::enum_count<WheelGemAffinity_t>() || quality >= magic_enum::enum_count<WheelGemQuality_t>()) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	const auto index = player->wheel().addPracticeGem(
+		static_cast<WheelGemAffinity_t>(affinity),
+		static_cast<WheelGemQuality_t>(quality),
+		static_cast<WheelGemBasicModifier_t>(Lua::getNumber<uint8_t>(L, 4)),
+		static_cast<WheelGemBasicModifier_t>(Lua::getNumber<uint8_t>(L, 5, 0)),
+		static_cast<WheelGemSupremeModifier_t>(Lua::getNumber<uint8_t>(L, 6, 0))
+	);
+	lua_pushnumber(L, index);
+	return 1;
+}
+
+int PlayerFunctions::luaPlayerSetActiveWheelGem(lua_State* L) {
+	// player:setActiveWheelGem(affinity[, gemIndex]) -- no index empties the vessel
+	const auto &player = Lua::getUserdataShared<Player>(L, 1, "Player");
+	if (!player) {
+		Lua::pushBoolean(L, false);
+		return 1;
+	}
+
+	const auto affinityId = Lua::getNumber<uint8_t>(L, 2);
+	if (affinityId >= magic_enum::enum_count<WheelGemAffinity_t>()) {
+		Lua::pushBoolean(L, false);
+		return 1;
+	}
+
+	const auto affinity = static_cast<WheelGemAffinity_t>(affinityId);
+	if (!Lua::isNumber(L, 3)) {
+		player->wheel().removeActiveGem(affinity);
+		Lua::pushBoolean(L, true);
+		return 1;
+	}
+
+	player->wheel().setActiveGem(affinity, Lua::getNumber<uint16_t>(L, 3));
+	Lua::pushBoolean(L, static_cast<bool>(player->wheel().getPracticeActiveGem(affinity)));
+	return 1;
+}
+
+int PlayerFunctions::luaPlayerGetActiveWheelGem(lua_State* L) {
+	// player:getActiveWheelGem(affinity) -- {quality, basic1, basic2, supreme, names...} or nil
+	const auto &player = Lua::getUserdataShared<Player>(L, 1, "Player");
+	if (!player) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	const auto affinityId = Lua::getNumber<uint8_t>(L, 2);
+	if (affinityId >= magic_enum::enum_count<WheelGemAffinity_t>()) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	const auto &gem = player->wheel().getPracticeActiveGem(static_cast<WheelGemAffinity_t>(affinityId));
+	if (!gem) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	lua_createtable(L, 0, 7);
+	Lua::setField(L, "quality", static_cast<uint8_t>(gem.quality));
+	Lua::setField(L, "basic1", static_cast<uint8_t>(gem.basicModifier1));
+	Lua::setField(L, "basic1Name", std::string(magic_enum::enum_name(gem.basicModifier1)));
+	if (gem.quality >= WheelGemQuality_t::Regular) {
+		Lua::setField(L, "basic2", static_cast<uint8_t>(gem.basicModifier2));
+		Lua::setField(L, "basic2Name", std::string(magic_enum::enum_name(gem.basicModifier2)));
+	}
+	if (gem.quality >= WheelGemQuality_t::Greater) {
+		Lua::setField(L, "supreme", static_cast<uint8_t>(gem.supremeModifier));
+		Lua::setField(L, "supremeName", std::string(magic_enum::enum_name(gem.supremeModifier)));
+	}
+	return 1;
+}
+
+int PlayerFunctions::luaPlayerGetWheelModGrade(lua_State* L) {
+	// player:getWheelModGrade(supreme, modifier)
+	const auto &player = Lua::getUserdataShared<Player>(L, 1, "Player");
+	if (!player) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	const auto type = Lua::getBoolean(L, 2) ? WheelFragmentType_t::Greater : WheelFragmentType_t::Lesser;
+	lua_pushnumber(L, player->wheel().getPracticeModGrade(type, Lua::getNumber<uint8_t>(L, 3)));
+	return 1;
+}
+
+int PlayerFunctions::luaPlayerSetWheelModGrade(lua_State* L) {
+	// player:setWheelModGrade(supreme, modifier, grade)
+	const auto &player = Lua::getUserdataShared<Player>(L, 1, "Player");
+	if (!player) {
+		Lua::pushBoolean(L, false);
+		return 1;
+	}
+
+	const auto type = Lua::getBoolean(L, 2) ? WheelFragmentType_t::Greater : WheelFragmentType_t::Lesser;
+	Lua::pushBoolean(L, player->wheel().setPracticeModGrade(type, Lua::getNumber<uint8_t>(L, 3), Lua::getNumber<uint8_t>(L, 4)));
+	return 1;
+}
+
+int PlayerFunctions::luaPlayerGetWheelTotalPoints(lua_State* L) {
+	// player:getWheelTotalPoints() -- level points + promotion scrolls + one per mod at grade III
+	const auto &player = Lua::getUserdataShared<Player>(L, 1, "Player");
+	if (!player) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	lua_pushnumber(L, player->wheel().getPracticeTotalPoints());
+	return 1;
+}
+
+int PlayerFunctions::luaPlayerReloadWheel(lua_State* L) {
+	// player:reloadWheel([openWindow = false]) -- re-applies slot, gem and grade bonuses
+	const auto &player = Lua::getUserdataShared<Player>(L, 1, "Player");
+	if (!player) {
+		Lua::pushBoolean(L, false);
+		return 1;
+	}
+
+	player->wheel().loadPlayerBonusData();
+	if (Lua::getBoolean(L, 2, false)) {
+		player->wheel().sendOpenWheelWindow(player->getID());
+	}
+	Lua::pushBoolean(L, true);
 	return 1;
 }
 

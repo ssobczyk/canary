@@ -472,6 +472,14 @@ public:
 	void toggleGemLock(uint16_t index);
 	void setActiveGem(WheelGemAffinity_t affinity, uint16_t index);
 	void removeActiveGem(WheelGemAffinity_t affinity);
+
+	// Practice server helpers: create gems and set mod grades directly, without gem items, fragments or gold
+	uint16_t addPracticeGem(WheelGemAffinity_t affinity, WheelGemQuality_t quality, WheelGemBasicModifier_t basicModifier1, WheelGemBasicModifier_t basicModifier2, WheelGemSupremeModifier_t supremeModifier);
+	const PlayerWheelGem &getPracticeActiveGem(WheelGemAffinity_t affinity) const;
+	uint8_t getPracticeModGrade(WheelFragmentType_t type, uint8_t pos) const;
+	bool setPracticeModGrade(WheelFragmentType_t type, uint8_t pos, uint8_t grade);
+	uint16_t getPracticeTotalPoints() const;
+
 	void addRevelationBonus(WheelGemAffinity_t affinity, uint16_t points);
 	void resetRevelationBonus();
 	void addSpellBonus(const std::string &spellName, const WheelSpells::Bonus &bonus);
