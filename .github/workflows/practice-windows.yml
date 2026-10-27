@@ -1,0 +1,20 @@
+---
+name: Practice Windows Build
+
+# Builds only the Windows binaries for the practice-server patches on this branch,
+# instead of the full CI matrix.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "practice/**"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  windows:
+    uses: ./.github/workflows/reusable-build-windows.yml
+    with:
+      run_canary_smoke: false

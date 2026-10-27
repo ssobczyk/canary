@@ -1011,7 +1011,11 @@ void Creature::goToFollowCreature() {
 		hasFollowPath = getPathTo(followCreature->getPosition(), listDir, fpp);
 	}
 
-	startAutoWalk(listDir);
+	// Practice server: an idle hostile monster starts chasing on the same tick its target steps away,
+	// like on the official servers. ImmediateWhenReady still honours the walk delay of a monster that
+	// is mid-walk, so this never makes a monster step faster than its speed allows.
+	const auto startPolicy = monster && !monster->getMaster() ? WalkStartPolicy::ImmediateWhenReady : WalkStartPolicy::RespectDelay;
+	startAutoWalk(listDir, false, startPolicy);
 
 	if (executeOnFollow) {
 		onFollowCreatureComplete(followCreature);
