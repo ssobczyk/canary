@@ -31,6 +31,7 @@
 #include "map/spectators.hpp"
 #include "kv/kv.hpp"
 #include "creatures/players/components/wheel/wheel_definitions.hpp"
+#include "enums/player_wheel.hpp"
 
 #include "enums/account_coins.hpp"
 #include "enums/account_errors.hpp"
